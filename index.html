@@ -1381,6 +1381,40 @@
   }
 
   .adv-add-section button:hover { background: var(--teal-dark); }
+
+  .adv-add-more-wrap {
+    margin-top: 0.75rem;
+  }
+
+  .adv-add-more-dz {
+    padding: 0.6rem 0.75rem !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 7px !important;
+    cursor: pointer;
+    border-radius: var(--radius-sm) !important;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--teal);
+    background: #eaf5f7 !important;
+    border: 1.5px dashed var(--teal) !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    transition: background 0.15s;
+  }
+
+  .adv-add-more-dz h4, .adv-add-more-dz p { display: none !important; }
+  .adv-add-more-dz .dropzone-icon { display: none !important; }
+  .adv-add-more-dz:hover { background: #d4eff3 !important; }
+  .adv-add-more-dz.dragover { background: #c0e8ef !important; }
+
+  .adv-tree-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+  }
 </style>
 </head>
 <body>
@@ -2660,7 +2694,7 @@ async function processConvert() {
   // DOCX — create a minimal valid .docx file
   const docxContent = buildMinimalDocx(docTitle, file.name, pageCount, fmtSize(file.size));
   setProgress(100);
-  showResult(`PDF converted! ${pageCount} pages processed.`, baseName + '.docx', docxContent);
+  showResult(`PDF converted! ${pageCount} pages processed.`, baseName + '.rtf', docxContent);
 }
 
 function buildMinimalDocx(title, filename, pages, size) {
@@ -2677,7 +2711,7 @@ Converted: ${new Date().toLocaleDateString()}\\par
 \\par
 ${Array.from({length:pages},(_,i)=>`\\f1\\b Page ${i+1}\\b0\\par\\f0 [Content of page ${i+1}]\\par\\par`).join('')}
 }`;
-  return new Blob([rtf], {type: 'application/msword'});
+  return new Blob([rtf], {type: 'application/rtf'});
 }
 
 // ── dummy render/process placeholders for tools config ──
@@ -2942,12 +2976,20 @@ function renderCompareTool() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
       <div>
         <p style="font-size:0.82rem;font-weight:600;color:var(--text-mid);margin-bottom:0.5rem">📄 Original PDF</p>
-        ${buildDropzone('PDF 1', false, '.pdf', f => { const p=f.find(x=>x.name.endsWith('.pdf')); if(p){state.files[0]=p; document.getElementById('cf0').innerHTML=fileListHTML([p],false); if(state.files[0]&&state.files[1])document.getElementById('cmpBtn').disabled=false; }})}
+        <div class="dropzone" id="cmp_dz0" onclick="document.getElementById('cmp_fi0').click()">
+          <div class="dropzone-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <h4>PDF 1</h4><p>Drop your PDF here or click to browse</p>
+          <input type="file" id="cmp_fi0" accept=".pdf">
+        </div>
         <div id="cf0"></div>
       </div>
       <div>
         <p style="font-size:0.82rem;font-weight:600;color:var(--text-mid);margin-bottom:0.5rem">📄 Revised PDF</p>
-        ${buildDropzone('PDF 2', false, '.pdf', f => { const p=f.find(x=>x.name.endsWith('.pdf')); if(p){state.files[1]=p; document.getElementById('cf1').innerHTML=fileListHTML([p],false); if(state.files[0]&&state.files[1])document.getElementById('cmpBtn').disabled=false; }})}
+        <div class="dropzone" id="cmp_dz1" onclick="document.getElementById('cmp_fi1').click()">
+          <div class="dropzone-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <h4>PDF 2</h4><p>Drop your PDF here or click to browse</p>
+          <input type="file" id="cmp_fi1" accept=".pdf">
+        </div>
         <div id="cf1"></div>
       </div>
     </div>
@@ -2956,6 +2998,26 @@ function renderCompareTool() {
       <div class="diff-summary" id="diffSum"></div>
       <div class="diff-panels" id="diffPan"></div>
     </div>`;
+
+  // Wire up file inputs and drag-drop for each compare dropzone independently
+  setTimeout(() => {
+    [0, 1].forEach(idx => {
+      const dz = document.getElementById('cmp_dz' + idx);
+      const fi = document.getElementById('cmp_fi' + idx);
+      if (!dz || !fi) return;
+      fi.addEventListener('change', e => {
+        const p = Array.from(e.target.files).find(x => x.name.endsWith('.pdf'));
+        if (p) { state.files[idx] = p; document.getElementById('cf' + idx).innerHTML = fileListHTML([p], false); if (state.files[0] && state.files[1]) document.getElementById('cmpBtn').disabled = false; }
+      });
+      dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+      dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+      dz.addEventListener('drop', e => {
+        e.preventDefault(); dz.classList.remove('dragover');
+        const p = Array.from(e.dataTransfer.files).find(x => x.name.endsWith('.pdf'));
+        if (p) { state.files[idx] = p; document.getElementById('cf' + idx).innerHTML = fileListHTML([p], false); if (state.files[0] && state.files[1]) document.getElementById('cmpBtn').disabled = false; }
+      });
+    });
+  }, 50);
 }
 
 window.doComparePDF = async function() {
@@ -3049,7 +3111,7 @@ window.doConvertPDF = async function() {
   } else {
     // RTF-based docx
     const rtf = `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}{\\f1\\froman\\fcharset0 Times New Roman;}}{\\colortbl;\\red5\\green78\\blue90;\\red225\\green183\\blue126;\\red18\\green63\\blue109;}\\viewkind4\\uc1\\pard\\f0\\fs36\\cf1\\b ${baseName}\\b0\\cf0\\par\\pard\\f0\\fs18\\cf0 Source: ${file.name}\\par Pages: ${n}  |  Size: ${fmtSize(file.size)}\\par Converted: ${new Date().toLocaleString()}\\par\\par${Array.from({length:n},(_,i)=>`\\pard\\f0\\fs22\\cf3\\b Page ${i+1}\\b0\\cf0\\par\\f1\\fs20 ${getPageInfo(doc,i)}\\par\\par`).join('')}}`;
-    blob=new Blob([rtf],{type:'application/msword'}); name=baseName+'.docx';
+    blob=new Blob([rtf],{type:'application/rtf'}); name=baseName+'.rtf';
   }
 
   setProgress(100);
@@ -3092,44 +3154,200 @@ function renderAdvancedRearrangeTool() {
   if (advState.files.length && advState.nodes.length) renderAdvTree();
 }
 
-function onAdvFiles(files) {
-  const pdfs = files.filter(f => f.name.endsWith('.pdf'));
-  if (!pdfs.length) return;
-  advState.files.push(...pdfs);
+// ── Bookmark extraction from PDFLib PDF ──
+function extractBookmarks(pdfDoc, fileIdx, totalPagesBefore) {
+  // Returns array of section nodes built from PDF outline (bookmarks)
+  // Falls back to null if no outline found
+  try {
+    const context = pdfDoc.context;
+    const catalog = pdfDoc.catalog;
+    const outlineRef = catalog.get(PDFLib.PDFName.of('Outlines'));
+    if (!outlineRef) return null;
+    const outline = context.lookup(outlineRef);
+    if (!outline) return null;
 
-  let pending = pdfs.length;
-  let startPage = advState.nodes.filter(n => !n.isSection).length;
+    const pageRefs = pdfDoc.getPages().map(p => p.ref);
 
-  pdfs.forEach((file, fi) => {
-    getPdfPageCount(file).then(n => {
-      const fileIdx = advState.files.indexOf(file);
-     // Create a section for uploaded file (fix for missing structure)
-const sectionNode = {
-  id: `s_${Date.now()}_${fileIdx}`,
-  label: file.name.replace('.pdf', ''),
-  isSection: true,
-  children: [],
-  collapsed: false
-};
+    function getPageIndexFromDest(dest) {
+      try {
+        // dest can be array or dict with /D
+        let arr = dest;
+        if (dest && dest.get) {
+          const d = dest.get(PDFLib.PDFName.of('D'));
+          if (d) arr = d;
+        }
+        if (!arr || !arr.get) return null;
+        const pageRef = arr.get(0);
+        if (!pageRef) return null;
+        const idx = pageRefs.findIndex(r => r.objectNumber === pageRef.objectNumber);
+        return idx >= 0 ? idx : null;
+      } catch { return null; }
+    }
 
-for (let i = 0; i < n; i++) {
-  sectionNode.children.push({
-    id: `p_${Date.now()}_${i}`,
-    label: `Page ${startPage + i + 1}`,
-    page: startPage + i,
-    fileIdx: fileIdx,
-    isSection: false,
-    children: [],
-    collapsed: false
-  });
+    function resolveAction(item) {
+      // Try /Dest first
+      const destVal = item.get(PDFLib.PDFName.of('Dest'));
+      if (destVal) {
+        const resolved = context.lookup(destVal);
+        return getPageIndexFromDest(resolved || destVal);
+      }
+      // Try /A (action dict) with /D
+      const actionVal = item.get(PDFLib.PDFName.of('A'));
+      if (actionVal) {
+        const action = context.lookup(actionVal);
+        if (action) {
+          const d = action.get(PDFLib.PDFName.of('D'));
+          if (d) {
+            const resolved = context.lookup(d);
+            return getPageIndexFromDest(resolved || d);
+          }
+        }
+      }
+      return null;
+    }
+
+    function getTitle(item) {
+      try {
+        const t = item.get(PDFLib.PDFName.of('Title'));
+        if (!t) return 'Untitled';
+        const raw = context.lookup(t) || t;
+        if (raw && raw.decodeText) return raw.decodeText();
+        if (raw && raw.value) return raw.value;
+        if (typeof raw === 'string') return raw;
+        return 'Untitled';
+      } catch { return 'Untitled'; }
+    }
+
+    // Walk the outline linked list
+    function walkOutline(firstRef, depth) {
+      const nodes = [];
+      let curRef = firstRef;
+      let safety = 0;
+      while (curRef && safety++ < 500) {
+        let cur;
+        try { cur = context.lookup(curRef); } catch { break; }
+        if (!cur || !cur.get) break;
+
+        const title = getTitle(cur);
+        const pageIdx = resolveAction(cur);
+        const id = `bm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+        // Check for children
+        const firstChild = cur.get(PDFLib.PDFName.of('First'));
+        const hasChildren = !!firstChild;
+
+        if (hasChildren) {
+          // This is a section bookmark
+          const children = walkOutline(firstChild, depth + 1);
+          // If bookmark itself also has a page dest, add it as first child page
+          if (pageIdx !== null) {
+            children.unshift({
+              id: `pg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+              label: `Page ${pageIdx + 1}`,
+              page: pageIdx,
+              fileIdx,
+              isSection: false,
+              children: [],
+              collapsed: false
+            });
+          }
+          nodes.push({ id, label: title, isSection: true, children, collapsed: false });
+        } else {
+          // Leaf bookmark — treat as page node if we have a page, else a section
+          if (pageIdx !== null) {
+            nodes.push({
+              id,
+              label: title,
+              page: pageIdx,
+              fileIdx,
+              isSection: false,
+              children: [],
+              collapsed: false
+            });
+          } else {
+            nodes.push({ id, label: title, isSection: true, children: [], collapsed: false });
+          }
+        }
+
+        // Move to next sibling
+        const nextRef = cur.get(PDFLib.PDFName.of('Next'));
+        curRef = nextRef || null;
+      }
+      return nodes;
+    }
+
+    const firstRef = outline.get(PDFLib.PDFName.of('First'));
+    if (!firstRef) return null;
+    const bmNodes = walkOutline(firstRef, 0);
+    return bmNodes.length > 0 ? bmNodes : null;
+  } catch(e) {
+    return null;
+  }
 }
 
-advState.nodes.push(sectionNode);
-      startPage += n;
-      pending--;
-      if (pending === 0) renderAdvTree();
-    });
-  });
+async function onAdvFiles(files) {
+  const pdfs = files.filter(f => f.name.endsWith('.pdf'));
+  if (!pdfs.length) return;
+
+  // Show loading indicator
+  const content = document.getElementById('advContent');
+  if (content) content.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--text-light);font-size:0.85rem">⏳ Reading bookmarks…</div>`;
+
+  let pending = pdfs.length;
+
+  for (const file of pdfs) {
+    advState.files.push(file);
+    const fileIdx = advState.files.indexOf(file);
+
+    try {
+      const buf = await file.arrayBuffer();
+      const pdfDoc = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true });
+      const pageCount = pdfDoc.getPageCount();
+
+      // Try to extract bookmarks
+      const bmNodes = extractBookmarks(pdfDoc, fileIdx, 0);
+
+      if (bmNodes && bmNodes.length > 0) {
+        // Wrap bookmarks in a file-level section
+        const fileSection = {
+          id: `s_${Date.now()}_${fileIdx}`,
+          label: file.name.replace(/\.pdf$/i, ''),
+          isSection: true,
+          children: bmNodes,
+          collapsed: false,
+          _fromBookmarks: true
+        };
+        advState.nodes.push(fileSection);
+        showToast(`📑 ${bmNodes.length} bookmark(s) loaded from "${file.name}"`, 'success');
+      } else {
+        // No bookmarks — flat pages under file section
+        const sectionNode = {
+          id: `s_${Date.now()}_${fileIdx}`,
+          label: file.name.replace(/\.pdf$/i, ''),
+          isSection: true,
+          children: [],
+          collapsed: false
+        };
+        for (let i = 0; i < pageCount; i++) {
+          sectionNode.children.push({
+            id: `p_${Date.now()}_${i}_${fileIdx}`,
+            label: `Page ${i + 1}`,
+            page: i,
+            fileIdx,
+            isSection: false,
+            children: [],
+            collapsed: false
+          });
+        }
+        advState.nodes.push(sectionNode);
+      }
+    } catch(e) {
+      showToast(`Could not read "${file.name}": ${e.message}`, 'error');
+    }
+
+    pending--;
+    if (pending === 0) renderAdvTree();
+  }
 }
 
 function renderAdvTree() {
@@ -3137,15 +3355,29 @@ function renderAdvTree() {
   if (!c) return;
 
   const fileList = advState.files.map((f, i) =>
-    `<div class="adv-file-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${f.name.length > 22 ? f.name.slice(0,20)+'…' : f.name}</div>`).join('');
+    `<div class="adv-file-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      ${f.name.length > 22 ? f.name.slice(0,20)+'…' : f.name}
+    </div>`).join('');
 
   c.innerHTML = `
     <div class="adv-rearrange-wrap">
       <div class="adv-file-panel">
         <div class="adv-file-panel-title">Loaded Files</div>
         ${fileList}
+        <div class="adv-add-more-wrap" id="advAddMoreWrap">
+          <div class="dropzone adv-add-more-dz" id="adv_more_dz" onclick="document.getElementById('adv_more_fi').click()" title="Add more PDFs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <span>Add More PDFs</span>
+            <input type="file" id="adv_more_fi" accept=".pdf" multiple style="display:none">
+          </div>
+        </div>
       </div>
       <div style="flex:1;display:flex;flex-direction:column">
+        <div class="adv-tree-header">
+          <span style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-mid)">Structure</span>
+          <span style="font-size:0.75rem;color:var(--text-light)">${countAdvPages(advState.nodes)} pages total</span>
+        </div>
         <div class="adv-tree-panel" id="advTree">${renderAdvNodes(advState.nodes)}</div>
         <div class="adv-add-section">
           <input type="text" id="advSectionName" placeholder="New section name…" />
@@ -3155,9 +3387,29 @@ function renderAdvTree() {
     </div>
     <button class="btn-action gold" style="margin-top:1rem" onclick="exportAdvRearrange()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Apply & Export PDF
+      Apply & Export PDF (with Bookmarks)
     </button>`;
+
   initAdvDrag();
+
+  // Wire up the "Add more PDFs" input
+  setTimeout(() => {
+    const fi = document.getElementById('adv_more_fi');
+    const dz = document.getElementById('adv_more_dz');
+    if (fi) fi.addEventListener('change', e => { onAdvFiles(Array.from(e.target.files)); e.target.value = ''; });
+    if (dz) {
+      dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+      dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+      dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); onAdvFiles(Array.from(e.dataTransfer.files)); });
+    }
+  }, 80);
+}
+
+function countAdvPages(nodes) {
+  let count = 0;
+  const walk = (arr) => { for (const n of arr) { if (!n.isSection) count++; if (n.children) walk(n.children); } };
+  walk(nodes);
+  return count;
 }
 
 function renderAdvNodes(nodes, depth) {
@@ -3329,18 +3581,119 @@ window.exportAdvRearrange = async function() {
       const buf = await file.arrayBuffer();
       docs.push(await PDFLib.PDFDocument.load(buf));
     }
-    setProgress(40);
+    setProgress(30);
+
     const newDoc = await PDFLib.PDFDocument.create();
+
+    // Build a map: {fileIdx, origPage} → newPageIndex
+    const pageMap = new Map();
+    for (let i = 0; i < pages.length; i++) {
+      const pg = pages[i];
+      pageMap.set(`${pg.fileIdx}:${pg.page}`, i);
+    }
+
+    // Copy pages
     for (const pg of pages) {
       const srcDoc = docs[pg.fileIdx];
       if (!srcDoc || pg.page >= srcDoc.getPageCount()) continue;
       const [copied] = await newDoc.copyPages(srcDoc, [pg.page]);
       newDoc.addPage(copied);
     }
+    setProgress(70);
+
+    // Write bookmarks (outline) into the new PDF from the tree structure
+    try {
+      const context = newDoc.context;
+      const newPageRefs = newDoc.getPages().map(p => p.ref);
+
+      // Recursively build outline entries
+      function buildOutlineEntries(nodes, parentRef) {
+        const refs = [];
+        for (const node of nodes) {
+          if (node.isSection) {
+            const childrenNodes = node.children || [];
+            // Create outline item dict
+            const itemRef = context.nextRef();
+            const childRefs = buildOutlineEntries(childrenNodes, itemRef);
+
+            const dict = context.obj({
+              Title: PDFLib.PDFString.of(node.label),
+              Parent: parentRef,
+            });
+
+            if (childRefs.length > 0) {
+              dict.set(PDFLib.PDFName.of('First'), childRefs[0]);
+              dict.set(PDFLib.PDFName.of('Last'), childRefs[childRefs.length - 1]);
+              dict.set(PDFLib.PDFName.of('Count'), PDFLib.PDFNumber.of(childRefs.length));
+            }
+
+            // Link siblings
+            for (let i = 0; i < childRefs.length; i++) {
+              const child = context.lookup(childRefs[i]);
+              if (i > 0) child.set(PDFLib.PDFName.of('Prev'), childRefs[i - 1]);
+              if (i < childRefs.length - 1) child.set(PDFLib.PDFName.of('Next'), childRefs[i + 1]);
+            }
+
+            // If section has a page dest (first child page)
+            const firstPage = childrenNodes.find(n => !n.isSection);
+            if (firstPage) {
+              const newPgIdx = pageMap.get(`${firstPage.fileIdx}:${firstPage.page}`);
+              if (newPgIdx != null && newPageRefs[newPgIdx]) {
+                dict.set(PDFLib.PDFName.of('Dest'), context.obj([newPageRefs[newPgIdx], PDFLib.PDFName.of('Fit')]));
+              }
+            }
+
+            context.assign(itemRef, dict);
+            refs.push(itemRef);
+
+          } else {
+            // Page node
+            const newPgIdx = pageMap.get(`${node.fileIdx}:${node.page}`);
+            if (newPgIdx == null || !newPageRefs[newPgIdx]) continue;
+
+            const itemRef = context.nextRef();
+            const dict = context.obj({
+              Title: PDFLib.PDFString.of(node.label),
+              Parent: parentRef,
+              Dest: context.obj([newPageRefs[newPgIdx], PDFLib.PDFName.of('Fit')]),
+            });
+            context.assign(itemRef, dict);
+            refs.push(itemRef);
+          }
+        }
+        return refs;
+      }
+
+      const outlineRef = context.nextRef();
+      const topRefs = buildOutlineEntries(advState.nodes, outlineRef);
+
+      if (topRefs.length > 0) {
+        // Link top-level siblings
+        for (let i = 0; i < topRefs.length; i++) {
+          const item = context.lookup(topRefs[i]);
+          if (i > 0) item.set(PDFLib.PDFName.of('Prev'), topRefs[i - 1]);
+          if (i < topRefs.length - 1) item.set(PDFLib.PDFName.of('Next'), topRefs[i + 1]);
+        }
+
+        const outlineDict = context.obj({
+          Type: PDFLib.PDFName.of('Outlines'),
+          First: topRefs[0],
+          Last: topRefs[topRefs.length - 1],
+          Count: PDFLib.PDFNumber.of(topRefs.length),
+        });
+        context.assign(outlineRef, outlineDict);
+        newDoc.catalog.set(PDFLib.PDFName.of('Outlines'), outlineRef);
+        newDoc.catalog.set(PDFLib.PDFName.of('PageMode'), PDFLib.PDFName.of('UseOutlines'));
+      }
+    } catch(bmErr) {
+      // Bookmark writing failed silently — PDF still exports without bookmarks
+      console.warn('Bookmark write failed:', bmErr);
+    }
+
     setProgress(90);
     const bytes = await newDoc.save();
     setProgress(100);
-    showResult(`Exported ${pages.length} pages in your custom order!`, 'advanced_rearranged.pdf', new Blob([bytes], { type: 'application/pdf' }));
+    showResult(`Exported ${pages.length} pages with bookmarks!`, 'advanced_rearranged.pdf', new Blob([bytes], { type: 'application/pdf' }));
   } catch(e) { showResult('Export failed: ' + e.message, '', null, true); }
 };
 
